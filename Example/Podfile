@@ -1,0 +1,13 @@
+use_frameworks!
+
+platform :ios, '8.0'
+
+target 'ZPMLagMonitor_Example' do
+  pod 'ZPMLagMonitor', :path => '../'
+
+  target 'ZPMLagMonitor_Tests' do
+    inherit! :search_paths
+
+    
+  end
+end
