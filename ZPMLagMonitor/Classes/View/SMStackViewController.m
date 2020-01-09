@@ -53,34 +53,24 @@ static NSString *smStackCellIdentifier = @"smStackCell";
 }
 
 - (void)selectItems {
-    RACScheduler *scheduler = [RACScheduler schedulerWithPriority:RACSchedulerPriorityHigh];
-    @weakify(self);
-    [[[[[SMLagDB shareInstance] selectStackWithPage:self.page]
-    subscribeOn:scheduler]
-    deliverOn:[RACScheduler mainThreadScheduler]]
-    subscribeNext:^(id x) {
-        @strongify(self);
-        self.tbView.mj_footer.hidden = NO;
-        if (self.listData.count > 0) {
-            //加载更多
-            [self.listData addObjectsFromArray:x];
-        } else {
-            //进入时加载
-            self.listData = x;
-            if (self.listData.count < 50) {
-                self.tbView.mj_footer.hidden = YES;
+    __weak typeof(self) weakSelf = self;
+    [[SMLagDB shareInstance] selectStackWithPage:self.page completion:^(NSArray * _Nonnull array) {
+        __strong typeof(weakSelf) strongSelf = weakSelf; if(!strongSelf) return;
+        strongSelf.tbView.mj_footer.hidden = array.count < 50; // 每页50条，如果小于50说明没有更多数据了
+        if (array.count > 0) {
+            if (strongSelf.listData.count > 0) {
+                //加载更多
+                [strongSelf.listData addObjectsFromArray:array];
+            } else {
+                //进入时加载
+                strongSelf.listData = [array mutableCopy];
             }
+            [strongSelf.tbView reloadData];
+            strongSelf.page += 1;
         }
-        //刷新
-        [self.tbView reloadData];
-    } error:^(NSError *error) {
-        //处理无数据显示
-        [self.tbView.mj_footer endRefreshingWithNoMoreData];
-    } completed:^{
-        //加载完成后的处理
-        [self.tbView.mj_footer endRefreshing];
+        [strongSelf.tbView.mj_footer endRefreshingWithNoMoreData];
+        [strongSelf.tbView.mj_footer endRefreshing];
     }];
-    self.page += 1;
 }
 
 #pragma mark - UITableView Delegate
@@ -148,23 +138,24 @@ static NSString *smStackCellIdentifier = @"smStackCell";
 - (SMLagButton *)closeView {
     if (!_closeView) {
         _closeView = [[SMLagButton alloc] initWithStr:@"退出" size:16 backgroundColor:[UIColor blackColor]];
-        @weakify(self);
-        [[_closeView click] subscribeNext:^(id x) {
-            @strongify(self);
-            [self close];
-        }];
+        __weak typeof(self) weakSelf = self;
+        _closeView.clickBlock = ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf; if(!strongSelf) return;
+            [strongSelf close];
+        };
     }
     return _closeView;
 }
 - (SMLagButton *)clearAndCloseView {
     if (!_clearAndCloseView) {
         _clearAndCloseView = [[SMLagButton alloc] initWithStr:@"清理" size:16 backgroundColor:[UIColor redColor]];
-        @weakify(self);
-        [[_clearAndCloseView click] subscribeNext:^(id x) {
-            @strongify(self);
+        __weak typeof(self) weakSelf = self;
+        _clearAndCloseView.clickBlock = ^{
+            __strong typeof(weakSelf) strongSelf = weakSelf; if(!strongSelf) return;
             [[SMLagDB shareInstance] clearStackData];
-            [self close];
-        }];
+            [strongSelf close];
+            
+        };
     }
     return _clearAndCloseView;
 }

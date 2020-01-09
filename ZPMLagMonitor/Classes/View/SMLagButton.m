@@ -21,11 +21,15 @@
         self.alpha = 0.7;
         self.layer.cornerRadius = 20;
         self.clipsToBounds = YES;
+        
         UILabel *l = [[UILabel alloc] init];
         l.text = str;
         l.font = [UIFont systemFontOfSize:size];
         l.textColor = [UIColor whiteColor];
+        
         self.bt = [UIButton buttonWithType:UIButtonTypeCustom];
+        [self.bt addTarget:self action:@selector(click) forControlEvents:UIControlEventTouchUpInside];
+        
         [self addSubview:l];
         [self addSubview:self.bt];
         [l mas_makeConstraints:^(MASConstraintMaker *make) {
@@ -38,13 +42,10 @@
     return self;
 }
 
-- (RACSignal *)click {
-    return [RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber) {
-        [[self.bt rac_signalForControlEvents:UIControlEventTouchUpInside] subscribeNext:^(id x) {
-            [subscriber sendNext:@"click"];
-        }];
-        return nil;
-    }];
+- (void)click{
+    if (self.clickBlock) {
+        self.clickBlock();
+    }
 }
 
 @end

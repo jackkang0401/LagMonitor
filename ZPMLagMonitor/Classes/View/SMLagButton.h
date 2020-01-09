@@ -7,13 +7,11 @@
 //
 
 #import <UIKit/UIKit.h>
-#import <ReactiveCocoa/ReactiveCocoa.h>
-#import <ReactiveCocoa/RACEXTScope.h>
 
 @interface SMLagButton : UIView
 
-- (instancetype)initWithStr:(NSString *)str size:(CGFloat)size backgroundColor:(UIColor *)color;
+@property (nonatomic, copy) void(^clickBlock)(void);
 
-- (RACSignal *)click;
+- (instancetype)initWithStr:(NSString *)str size:(CGFloat)size backgroundColor:(UIColor *)color;
 
 @end

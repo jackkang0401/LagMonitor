@@ -35,7 +35,7 @@
                     SMCallStackModel *model = [[SMCallStackModel alloc] init];
                     model.stackStr = reStr;
                     //记录数据库中
-                    [[[SMLagDB shareInstance] increaseWithStackModel:model] subscribeNext:^(id x) {}];
+                    [[SMLagDB shareInstance] increaseWithStackModel:model];
 //                    NSLog(@"CPU useage overload thread stack：\n%@",reStr);
                 }
             }

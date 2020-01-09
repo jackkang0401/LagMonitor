@@ -62,69 +62,57 @@
 }
 
 #pragma mark - 卡顿和CPU超标堆栈
-//添加 stack 表数据
-- (RACSignal *)increaseWithStackModel:(SMCallStackModel *)model {
-    @weakify(self);
-    return [RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber) {
-        if ([model.stackStr containsString:@"+[SMCallStack callStackWithType:]"] || [model.stackStr containsString:@"-[SMLagMonitor updateCPUInfo]"]) {
-            return nil;
-        }
-        @strongify(self);
-        [self.dbQueue inDatabase:^(FMDatabase *db){
-            if ([db open]) {
-                NSNumber *stuck = @0;
-                if (model.isStuck) {
-                    stuck = @1;
-                }
-                [db executeUpdate:@"insert into stack (stackcontent, isstuck, insertdate) values (?, ?, ?)",model.stackStr, stuck, [NSDate date]];
-                [db close];
-                [subscriber sendCompleted];
+
+// 添加 Stack 记录
+- (void)increaseWithStackModel:(SMCallStackModel *)model {
+    [self.dbQueue inDatabase:^(FMDatabase *db){
+        if ([db open]) {
+            NSNumber *stuck = @0;
+            if (model.isStuck) {
+                stuck = @1;
             }
-        }];
-        
-        return nil;
+            [db executeUpdate:@"insert into stack (stackcontent, isstuck, insertdate) values (?, ?, ?)",model.stackStr, stuck, [NSDate date]];
+            [db close];
+        }
     }];
 }
-//stack 分页查询
-- (RACSignal *)selectStackWithPage:(NSUInteger)page {
-    @weakify(self);
-    return [RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber) {
-        @strongify(self);
-        FMDatabase *db = [FMDatabase databaseWithPath:self.clsCallDBPath];
+
+// 分页查询 Stack 数据
+- (void)selectStackWithPage:(NSUInteger)page completion:(void (^ __nullable)(NSArray *array))completion {
+    [self.dbQueue inDatabase:^(FMDatabase * _Nonnull db) {
+        NSMutableArray *arr = [NSMutableArray array];
         if ([db open]) {
             FMResultSet *rs = [db executeQuery:@"select * from stack order by sid desc limit ?, 50",@(page * 50)];
-            NSUInteger count = 0;
-            NSMutableArray *arr = [NSMutableArray array];
             while ([rs next]) {
                 SMCallStackModel *model = [[SMCallStackModel alloc] init];
                 model.stackStr = [rs stringForColumn:@"stackcontent"];
                 model.isStuck = [rs boolForColumn:@"isstuck"];
                 model.dateString = [rs doubleForColumn:@"insertdate"];
                 [arr addObject:model];
-                count++;
-            }
-            if (count > 0) {
-                [subscriber sendNext:arr];
-                [subscriber sendCompleted];
-            } else {
-                [subscriber sendError:nil];
             }
             [db close];
         }
-        return nil;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) {
+                completion([arr copy]);
+            }
+        });
     }];
 }
-//stack 表清除
+
+// 清空 Stack 数据
 - (void)clearStackData {
-    FMDatabase *db = [FMDatabase databaseWithPath:self.clsCallDBPath];
-    if ([db open]) {
-        [db executeUpdate:@"delete from stack"];
-        [db close];
-    }
+    [self.dbQueue inDatabase:^(FMDatabase * _Nonnull db) {
+        if ([db open]) {
+            [db executeUpdate:@"delete from stack"];
+            [db close];
+        }
+    }];
 }
 
 #pragma mark - ClsCall方法调用频次
-//添加记录
+
+// 添加 Trace 记录
 - (void)addWithClsCallModel:(SMCallTraceTimeCostModel *)model {
     if ([model.methodName isEqualToString:@"clsCallInsertToViewWillAppear"] || [model.methodName isEqualToString:@"clsCallInsertToViewWillDisappear"]) {
         return;
@@ -151,39 +139,34 @@
     }];
 }
 
-//分页查询
-- (RACSignal *)selectClsCallWithPage:(NSUInteger)page {
-    @weakify(self);
-    return [RACSignal createSignal:^RACDisposable *(id<RACSubscriber> subscriber) {
-        @strongify(self);
-        FMDatabase *db = [FMDatabase databaseWithPath:self.clsCallDBPath];
+// 分页查询 Trace 数据
+- (void)selectClsCallWithPage:(NSUInteger)page completion:(void (^ __nullable)(NSArray *array))completion {
+    [self.dbQueue inDatabase:^(FMDatabase * _Nonnull db) {
+        NSMutableArray *arr = [NSMutableArray array];
         if ([db open]) {
             FMResultSet *rs = [db executeQuery:@"select * from clscall where lastcall=? order by frequency desc limit ?, 50",@1, @(page * 50)];
-            NSUInteger count = 0;
-            NSMutableArray *arr = [NSMutableArray array];
             while ([rs next]) {
                 SMCallTraceTimeCostModel *model = [self clsCallModelFromResultSet:rs];
                 [arr addObject:model];
-                count ++;
-            }
-            if (count > 0) {
-                [subscriber sendNext:arr];
-            } else {
-                [subscriber sendError:nil];
             }
             [db close];
         }
-        return nil;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) {
+                completion([arr copy]);
+            }
+        });
     }];
 }
 
-//清除数据
+// 清除 Trace 数据
 - (void)clearClsCallData {
-    FMDatabase *db = [FMDatabase databaseWithPath:self.clsCallDBPath];
-    if ([db open]) {
-        [db executeUpdate:@"delete from clscall"];
-        [db close];
-    }
+    [self.dbQueue inDatabase:^(FMDatabase * _Nonnull db) {
+        if ([db open]) {
+            [db executeUpdate:@"delete from clscall"];
+            [db close];
+        }
+    }];
 }
 
 //结果封装成 model

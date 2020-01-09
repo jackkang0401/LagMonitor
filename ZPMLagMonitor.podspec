@@ -41,7 +41,6 @@ TODO: Add long description of the pod here.
   
   s.dependency 'AFNetworking'
   s.dependency 'FMDB'
-  s.dependency 'ReactiveCocoa', '=2.3'
   s.dependency 'MJRefresh'
   s.dependency 'Masonry'
   

@@ -80,7 +80,7 @@
                         SMCallStackModel *model = [[SMCallStackModel alloc] init];
                         model.stackStr = stackStr;
                         model.isStuck = YES;
-                        [[[SMLagDB shareInstance] increaseWithStackModel:model] subscribeNext:^(id x) {}];
+                        [[SMLagDB shareInstance] increaseWithStackModel:model];
                     });
                 } //end activity
             }// end semaphore wait

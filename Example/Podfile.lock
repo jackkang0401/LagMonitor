@@ -19,19 +19,11 @@ PODS:
   - FMDB/standard (2.7.5)
   - Masonry (1.1.0)
   - MJRefresh (3.3.1)
-  - ReactiveCocoa (2.3):
-    - ReactiveCocoa/UI (= 2.3)
-  - ReactiveCocoa/Core (2.3):
-    - ReactiveCocoa/no-arc
-  - ReactiveCocoa/no-arc (2.3)
-  - ReactiveCocoa/UI (2.3):
-    - ReactiveCocoa/Core
   - ZPMLagMonitor (0.1.0):
     - AFNetworking
     - FMDB
     - Masonry
     - MJRefresh
-    - ReactiveCocoa (= 2.3)
 
 DEPENDENCIES:
   - ZPMLagMonitor (from `../`)
@@ -42,7 +34,6 @@ SPEC REPOS:
     - FMDB
     - Masonry
     - MJRefresh
-    - ReactiveCocoa
 
 EXTERNAL SOURCES:
   ZPMLagMonitor:
@@ -53,8 +44,7 @@ SPEC CHECKSUMS:
   FMDB: 2ce00b547f966261cd18927a3ddb07cb6f3db82a
   Masonry: 678fab65091a9290e40e2832a55e7ab731aad201
   MJRefresh: eeda70fbf0ad277f3178cef1cd0c3532591d6237
-  ReactiveCocoa: 81ee2fb7df2dfc6bd52b5d70473662195e20ca7d
-  ZPMLagMonitor: 1fc77654ef736ff16ff75e9ffa8b70bba9a003c8
+  ZPMLagMonitor: d6b316b1c8d366575f880079025fdc0539756c16
 
 PODFILE CHECKSUM: e12d5ba2e0c6044773fb7f64dd113650107371e8
 
