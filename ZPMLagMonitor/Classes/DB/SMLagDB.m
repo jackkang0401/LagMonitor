@@ -101,12 +101,17 @@
 }
 
 // 清空 Stack 数据
-- (void)clearStackData {
+- (void)clearStackDataCompletion:(void (^ __nullable)(void))completion {
     [self.dbQueue inDatabase:^(FMDatabase * _Nonnull db) {
         if ([db open]) {
             [db executeUpdate:@"delete from stack"];
             [db close];
         }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) {
+                completion();
+            }
+        });
     }];
 }
 
@@ -160,12 +165,17 @@
 }
 
 // 清除 Trace 数据
-- (void)clearClsCallData {
+- (void)clearClsCallDataCompletion:(void (^ __nullable)(void))completion {
     [self.dbQueue inDatabase:^(FMDatabase * _Nonnull db) {
         if ([db open]) {
             [db executeUpdate:@"delete from clscall"];
             [db close];
         }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (completion) {
+                completion();
+            }
+        });
     }];
 }
 

@@ -36,7 +36,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)selectStackWithPage:(NSUInteger)page completion:(void (^ __nullable)(NSArray *array))completion;
 
 /// 清空 Stack 数据
-- (void)clearStackData;
+/// @param completion 清理完毕回调
+- (void)clearStackDataCompletion:(void (^ __nullable)(void))completion;
 
 
 /*------------ClsCall方法调用频次-------------*/
@@ -51,7 +52,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)selectClsCallWithPage:(NSUInteger)page completion:(void (^ __nullable)(NSArray *array))completion;
 
 /// 清除 Trace 数据
-- (void)clearClsCallData;
+/// @param completion 清理完毕回调
+- (void)clearClsCallDataCompletion:(void (^ __nullable)(void))completion;
 
 
 @end

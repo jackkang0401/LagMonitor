@@ -12,7 +12,6 @@
 #import "Masonry.h"
 #import "SMLagDB.h"
 #import "SMCallTraceTimeCostModel.h"
-#import "SMLagButton.h"
 
 static NSString *smClsCallCellIdentifier = @"smClsCallCell";
 
@@ -21,8 +20,7 @@ static NSString *smClsCallCellIdentifier = @"smClsCallCell";
 @property (nonatomic, strong) NSMutableArray *listData;
 @property (nonatomic, strong) UITableView *tbView;
 @property (nonatomic) NSUInteger page;
-@property (nonatomic, strong) SMLagButton *closeView;
-@property (nonatomic, strong) SMLagButton *clearAndCloseView;
+@property (nonatomic, strong) UIBarButtonItem *clearBarButtonItem;
 
 @end
 
@@ -39,23 +37,7 @@ static NSString *smClsCallCellIdentifier = @"smClsCallCell";
         make.bottom.left.right.equalTo(self.view);
         make.top.equalTo(self.view).offset(20);
     }];
-    [self.view addSubview:self.closeView];
-    [self.closeView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.right.equalTo(self.view).offset(-10);
-        make.top.equalTo(self.view).offset(20);
-        make.size.mas_equalTo(CGSizeMake(40, 40));
-    }];
-    [self.view addSubview:self.clearAndCloseView];
-    [self.clearAndCloseView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.right.equalTo(self.closeView.mas_left).offset(-10);
-        make.top.equalTo(self.closeView);
-        make.size.mas_equalTo(CGSizeMake(40, 40));
-    }];
-}
-
-- (void)didReceiveMemoryWarning {
-    [super didReceiveMemoryWarning];
-    
+    self.navigationItem.rightBarButtonItems = @[self.clearBarButtonItem];
 }
 
 - (void)selectItems {
@@ -114,9 +96,6 @@ static NSString *smClsCallCellIdentifier = @"smClsCallCell";
     
     return cell;
 }
-- (void)close {
-    [self.navigationController popViewControllerAnimated:YES];
-}
 
 #pragma mark - Getter
 - (NSMutableArray *)listData {
@@ -144,29 +123,26 @@ static NSString *smClsCallCellIdentifier = @"smClsCallCell";
     }
     return _tbView;
 }
-- (SMLagButton *)closeView {
-    if (!_closeView) {
-        _closeView = [[SMLagButton alloc] initWithStr:@"退出" size:16 backgroundColor:[UIColor blackColor]];
-        __weak typeof(self) weakSelf = self;
-        _closeView.clickBlock = ^{
-            __strong typeof(weakSelf) strongSelf = weakSelf; if(!strongSelf) return;
-            [strongSelf close];
-        };
+
+- (UIBarButtonItem *)clearBarButtonItem {
+    if (!_clearBarButtonItem) {
+        UIButton *btn = [UIButton buttonWithType:UIButtonTypeSystem];
+        [btn setTitle:@"清除" forState:UIControlStateNormal];
+        btn.titleLabel.font = [UIFont systemFontOfSize:12.f weight:UIFontWeightBold];
+        [btn addTarget:self action:@selector(btnClick) forControlEvents:UIControlEventTouchUpInside];
+        _clearBarButtonItem = [[UIBarButtonItem alloc] initWithCustomView:btn];
     }
-    return _closeView;
+    return _clearBarButtonItem;
 }
-- (SMLagButton *)clearAndCloseView {
-    if (!_clearAndCloseView) {
-        _clearAndCloseView = [[SMLagButton alloc] initWithStr:@"清理" size:16 backgroundColor:[UIColor redColor]];
-        __weak typeof(self) weakSelf = self;
-        _clearAndCloseView.clickBlock = ^{
-            __strong typeof(weakSelf) strongSelf = weakSelf; if(!strongSelf) return;
-            [[SMLagDB shareInstance] clearClsCallData];
-            [strongSelf close];
-            
-        };
-    }
-    return _clearAndCloseView;
+
+- (void)btnClick{
+    __weak typeof(self) weakSelf = self;
+    [[SMLagDB shareInstance] clearClsCallDataCompletion:^{
+        __strong typeof(weakSelf) strongSelf = weakSelf; if(!strongSelf) return;
+        strongSelf.page = 1;
+        [strongSelf.listData removeAllObjects];
+        [strongSelf.tbView reloadData];
+    }];
 }
 
 @end
