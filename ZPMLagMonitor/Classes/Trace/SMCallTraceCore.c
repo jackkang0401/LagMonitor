@@ -11,229 +11,6 @@
 
 #ifdef __aarch64__
 
-#pragma mark - fishhook
-#include <stddef.h>
-#include <stdint.h>
-#include <dlfcn.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-#include <mach-o/dyld.h>
-#include <mach-o/loader.h>
-#include <mach-o/nlist.h>
-
-/*
- * A structure representing a particular intended rebinding from a symbol
- * name to its replacement
- */
-struct rebinding {
-    const char *name;
-    void *replacement;
-    void **replaced;
-};
-
-/*
- * For each rebinding in rebindings, rebinds references to external, indirect
- * symbols with the specified name to instead point at replacement for each
- * image in the calling process as well as for all future images that are loaded
- * by the process. If rebind_functions is called more than once, the symbols to
- * rebind are added to the existing list of rebindings, and if a given symbol
- * is rebound more than once, the later rebinding will take precedence.
- */
-static int fish_rebind_symbols(struct rebinding rebindings[], size_t rebindings_nel);
-
-
-#ifdef __LP64__
-typedef struct mach_header_64 mach_header_t;
-typedef struct segment_command_64 segment_command_t;
-typedef struct section_64 section_t;
-typedef struct nlist_64 nlist_t;
-#define LC_SEGMENT_ARCH_DEPENDENT LC_SEGMENT_64
-#else
-typedef struct mach_header mach_header_t;
-typedef struct segment_command segment_command_t;
-typedef struct section section_t;
-typedef struct nlist nlist_t;
-#define LC_SEGMENT_ARCH_DEPENDENT LC_SEGMENT
-#endif
-
-#ifndef SEG_DATA_CONST
-#define SEG_DATA_CONST  "__DATA_CONST"
-#endif
-
-struct rebindings_entry {
-    struct rebinding *rebindings;
-    size_t rebindings_nel;
-    struct rebindings_entry *next;
-};
-
-static struct rebindings_entry *_rebindings_head;
-
-static int prepend_rebindings(struct rebindings_entry **rebindings_head,
-                              struct rebinding rebindings[],
-                              size_t nel) {
-    struct rebindings_entry *new_entry = malloc(sizeof(struct rebindings_entry));
-    if (!new_entry) {
-        return -1;
-    }
-    new_entry->rebindings = malloc(sizeof(struct rebinding) * nel);
-    if (!new_entry->rebindings) {
-        free(new_entry);
-        return -1;
-    }
-    // 从源内存地址的起始位置开始拷贝若干个字节到目标内存地址中
-    memcpy(new_entry->rebindings, rebindings, sizeof(struct rebinding) * nel);
-    new_entry->rebindings_nel = nel;
-    new_entry->next = *rebindings_head;
-    *rebindings_head = new_entry;
-    return 0;
-}
-
-static void perform_rebinding_with_section(struct rebindings_entry *rebindings,
-                                           section_t *section,
-                                           intptr_t slide,
-                                           nlist_t *symtab,
-                                           char *strtab,
-                                           uint32_t *indirect_symtab) {
-    uint32_t *indirect_symbol_indices = indirect_symtab + section->reserved1; // 获取符号表的数组
-    void **indirect_symbol_bindings = (void **)((uintptr_t)slide + section->addr); // 获取函数指针列表
-    for (uint i = 0; i < section->size / sizeof(void *); i++) {
-        uint32_t symtab_index = indirect_symbol_indices[i]; // 获取符号表索引 symtab_index
-        if (symtab_index == INDIRECT_SYMBOL_ABS || symtab_index == INDIRECT_SYMBOL_LOCAL ||
-            symtab_index == (INDIRECT_SYMBOL_LOCAL   | INDIRECT_SYMBOL_ABS)) {
-            continue;
-        }
-        // 通过符号表索引 symtab_index 获取符号表中某一个 n_list 结构体，得到字符串表中的索引
-        uint32_t strtab_offset = symtab[symtab_index].n_un.n_strx;
-        char *symbol_name = strtab + strtab_offset; // 在字符串表中获得符号的名字
-        if (strnlen(symbol_name, 2) < 2) {
-            continue;
-        }
-        struct rebindings_entry *cur = rebindings;
-        while (cur) {
-            for (uint j = 0; j < cur->rebindings_nel; j++) {
-                if (strcmp(&symbol_name[1], cur->rebindings[j].name) == 0) {
-                    if (cur->rebindings[j].replaced != NULL &&
-                        indirect_symbol_bindings[i] != cur->rebindings[j].replacement) {
-                        // 将原函数的实现传入 original_open 函数指针的地址
-                        *(cur->rebindings[j].replaced) = indirect_symbol_bindings[i];
-                    }
-                    // 使用新的函数实现 new_open 替换原实现
-                    indirect_symbol_bindings[i] = cur->rebindings[j].replacement;
-                    goto symbol_loop;
-                }
-            }
-            cur = cur->next;
-        }
-    symbol_loop:;
-    }
-}
-
-static void rebind_symbols_for_image(struct rebindings_entry *rebindings,
-                                     const struct mach_header *header,
-                                     intptr_t slide) {
-    Dl_info info;
-    if (dladdr(header, &info) == 0) {
-        return;
-    }
-    
-    segment_command_t *cur_seg_cmd;
-    segment_command_t *linkedit_segment = NULL;
-    struct symtab_command* symtab_cmd = NULL;
-    struct dysymtab_command* dysymtab_cmd = NULL;
-    
-    uintptr_t cur = (uintptr_t)header + sizeof(mach_header_t); // 跳过 mach_header_t 长度的位置
-    for (uint i = 0; i < header->ncmds; i++, cur += cur_seg_cmd->cmdsize) {
-        cur_seg_cmd = (segment_command_t *)cur;     // 将指针强转成 segment_command_t
-        
-        // 通过对比 cmd 的值，来找到需要的 segment_command_t
-        if (cur_seg_cmd->cmd == LC_SEGMENT_ARCH_DEPENDENT) {
-            if (strcmp(cur_seg_cmd->segname, SEG_LINKEDIT) == 0) {
-                linkedit_segment = cur_seg_cmd;
-            }
-        } else if (cur_seg_cmd->cmd == LC_SYMTAB) {
-            symtab_cmd = (struct symtab_command*)cur_seg_cmd;
-        } else if (cur_seg_cmd->cmd == LC_DYSYMTAB) {
-            dysymtab_cmd = (struct dysymtab_command*)cur_seg_cmd;
-        }
-    }
-    
-    if (!symtab_cmd || !dysymtab_cmd || !linkedit_segment ||
-        !dysymtab_cmd->nindirectsyms) {
-        return;
-    }
-    
-    // Find base symbol/string table addresses
-    // 在 linkedit_segment 结构体中获得其虚拟地址以及文件偏移量，
-    // 然后计算 __LINKEDIT Segment 的位置：slide + vmaffr - fileoff
-    uintptr_t linkedit_base = (uintptr_t)slide + linkedit_segment->vmaddr - linkedit_segment->fileoff;
-    
-    // 从 symtab_command 中获取符号表偏移量和字符串表偏移量，就能够获得符号表、字符串表的引用
-    nlist_t *symtab = (nlist_t *)(linkedit_base + symtab_cmd->symoff);
-    char *strtab = (char *)(linkedit_base + symtab_cmd->stroff);
-    
-    // Get indirect symbol table (array of uint32_t indices into symbol table)
-    // 再从 dysymtab_command 中获取间接符号表偏移量，间接符号表的引用
-    uint32_t *indirect_symtab = (uint32_t *)(linkedit_base + dysymtab_cmd->indirectsymoff);
-    
-    /*
-     间接符号表中的元素都是 uint32_t *，指针的值是对应条目 n_list 在符号表中的位置
-
-     符号表中的元素都是 nlist_t 结构体，其中包含了当前符号在字符串表中的下标
-     
-     字符串表中的元素是 char 字符
-     */
-    
-    // 查找整个镜像中的 SECTION_TYPE 为 S_LAZY_SYMBOL_POINTERS 或者 S_NON_LAZY_SYMBOL_POINTERS 的 section
-    cur = (uintptr_t)header + sizeof(mach_header_t);
-    for (uint i = 0; i < header->ncmds; i++, cur += cur_seg_cmd->cmdsize) {
-        cur_seg_cmd = (segment_command_t *)cur;
-        if (cur_seg_cmd->cmd == LC_SEGMENT_ARCH_DEPENDENT) {
-            if (strcmp(cur_seg_cmd->segname, SEG_DATA) != 0 &&
-                strcmp(cur_seg_cmd->segname, SEG_DATA_CONST) != 0) {
-                continue;
-            }
-            for (uint j = 0; j < cur_seg_cmd->nsects; j++) {
-                section_t *sect =
-                (section_t *)(cur + sizeof(segment_command_t)) + j;
-                if ((sect->flags & SECTION_TYPE) == S_LAZY_SYMBOL_POINTERS) {
-                    perform_rebinding_with_section(rebindings, sect, slide, symtab, strtab, indirect_symtab);
-                }
-                if ((sect->flags & SECTION_TYPE) == S_NON_LAZY_SYMBOL_POINTERS) {
-                    perform_rebinding_with_section(rebindings, sect, slide, symtab, strtab, indirect_symtab);
-                }
-            }
-        }
-    }
-}
-
-static void _rebind_symbols_for_image(const struct mach_header *header,
-                                      intptr_t slide) {
-    rebind_symbols_for_image(_rebindings_head, header, slide);
-}
-
-static int fish_rebind_symbols(struct rebinding rebindings[], size_t rebindings_nel) {
-    int retval = prepend_rebindings(&_rebindings_head, rebindings, rebindings_nel);
-    if (retval < 0) {
-        return retval;
-    }
-    // If this was the first call, register callback for image additions (which is also invoked for
-    // existing images, otherwise, just run on existing images
-    // 首先是遍历 dyld 里的所有的 image，取出 image header 和 slide。注意第一次调用时主要注册 callback
-    if (!_rebindings_head->next) {
-        _dyld_register_func_for_add_image(_rebind_symbols_for_image); // 注册加载动态库回调(如果镜像已存在也会调用)
-    } else {
-        uint32_t c = _dyld_image_count();
-        for (uint32_t i = 0; i < c; i++) {
-            _rebind_symbols_for_image(_dyld_get_image_header(i), _dyld_get_image_vmaddr_slide(i));
-        }
-    }
-    return retval;
-}
-
-
-#pragma mark - Record
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -247,8 +24,10 @@ static int fish_rebind_symbols(struct rebinding rebindings[], size_t rebindings_
 #include <dispatch/dispatch.h>
 #include <pthread.h>
 
+#include "fishhook.h"
+
 static bool _call_record_enabled = true;
-static uint64_t _min_time_cost = 1000; //us
+static uint64_t _min_time_cost = 1000; // us
 static int _max_call_depth = 3;
 static pthread_key_t _thread_key;
 __unused static id (*orig_objc_msgSend)(id, SEL, ...);
@@ -260,11 +39,11 @@ static int _smRecordNum;
 static int _smRecordAlloc;
 
 typedef struct {
-    id self; //通过 object_getClass 能够得到 Class 再通过 NSStringFromClass 能够得到类名
+    id self;            // 通过 object_getClass 能够得到 Class 再通过 NSStringFromClass 能够得到类名
     Class cls;
-    SEL cmd; //通过 NSStringFromSelector 方法能够得到方法名
-    uint64_t time; //us
-    uintptr_t lr; // link register
+    SEL cmd;            // 通过 NSStringFromSelector 方法能够得到方法名
+    uint64_t time;      // us
+    uintptr_t lr;       // link register
 } thread_call_record;
 
 typedef struct {
@@ -359,10 +138,6 @@ uintptr_t after_objc_msgSend() {
 }
 
 
-//replacement objc_msgSend (arm64)
-// https://blog.nelhage.com/2010/10/amd64-and-va_arg/
-// http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
-// https://developer.apple.com/library/ios/documentation/Xcode/Conceptual/iPhoneOSABIReference/Articles/ARM64FunctionCallingConventions.html
 #define call(b, value) \
 __asm volatile ("stp x8, x9, [sp, #-16]!\n"); \
 __asm volatile ("mov x12, %0\n" :: "r"(value)); \
@@ -430,18 +205,18 @@ static void hook_Objc_msgSend() {
 
 #pragma mark public
 
-void smCallTraceStart() {
+void smCallTraceStart(void) {
     _call_record_enabled = true;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         pthread_key_create(&_thread_key, &release_thread_call_stack);
-        fish_rebind_symbols((struct rebinding[6]){
+        rebind_symbols((struct rebinding[6]){
             {"objc_msgSend", (void *)hook_Objc_msgSend, (void **)&orig_objc_msgSend},
         }, 1);
     });
 }
 
-void smCallTraceStop() {
+void smCallTraceStop(void) {
     _call_record_enabled = false;
 }
 
@@ -459,7 +234,7 @@ smCallRecord *smGetCallRecords(int *num) {
     return _smCallRecords;
 }
 
-void smClearCallRecords() {
+void smClearCallRecords(void) {
     if (_smCallRecords) {
         free(_smCallRecords);
         _smCallRecords = NULL;
@@ -469,8 +244,8 @@ void smClearCallRecords() {
 
 #else
 
-void smCallTraceStart() {}
-void smCallTraceStop() {}
+void smCallTraceStart(void) {}
+void smCallTraceStop(void) {}
 void smCallConfigMinTime(uint64_t us) {
 }
 void smCallConfigMaxDepth(int depth) {
@@ -481,6 +256,6 @@ smCallRecord *smGetCallRecords(int *num) {
     }
     return NULL;
 }
-void smClearCallRecords() {}
+void smClearCallRecords(void) {}
 
 #endif

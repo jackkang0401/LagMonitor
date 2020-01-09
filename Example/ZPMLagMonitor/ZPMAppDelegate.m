@@ -7,15 +7,11 @@
 //
 
 #import "ZPMAppDelegate.h"
-#import <ZPMLagMonitor/SMStackViewController.h>
 
 @implementation ZPMAppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-    [[SMStackViewController alloc] init];
-    
-    
     // Override point for customization after application launch.
     return YES;
 }

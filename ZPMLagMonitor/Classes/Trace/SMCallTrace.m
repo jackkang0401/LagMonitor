@@ -78,7 +78,7 @@
         model.className = NSStringFromClass(rd->cls);
         model.methodName = NSStringFromSelector(rd->sel);
         model.isClassMethod = class_isMetaClass(rd->cls);
-        model.timeCost = (double)rd->time / 1000000.0;
+        model.timeCost = (double)rd->time / 1000000.0; // s 
         model.callDepth = rd->depth;
         [arr addObject:model];
     }

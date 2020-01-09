@@ -19,14 +19,14 @@ typedef struct {
     int depth;
 } smCallRecord;
 
-extern void smCallTraceStart();
-extern void smCallTraceStop();
+extern void smCallTraceStart(void);
+extern void smCallTraceStop(void);
 
 extern void smCallConfigMinTime(uint64_t us); //default 1000
 extern void smCallConfigMaxDepth(int depth);  //default 3
 
 extern smCallRecord *smGetCallRecords(int *num);
-extern void smClearCallRecords();
+extern void smClearCallRecords(void);
 
 
 
