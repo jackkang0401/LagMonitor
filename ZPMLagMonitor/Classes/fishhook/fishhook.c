@@ -36,6 +36,7 @@
 #include <mach-o/loader.h>
 #include <mach-o/nlist.h>
 
+// 在64位机器上，如果int是32位，long是64位，pointer也是64位，那么该机器就是LP64
 #ifdef __LP64__
 typedef struct mach_header_64 mach_header_t;
 typedef struct segment_command_64 segment_command_t;

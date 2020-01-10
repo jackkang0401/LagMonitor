@@ -7,10 +7,8 @@
 //
 
 #include "SMCallTraceCore.h"
-
-
+// arm64架构又分为2种执行状态： AArch64 Application Level 和 AArch32 Application Level
 #ifdef __aarch64__
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,17 +24,96 @@
 
 #include "fishhook.h"
 
-static bool _call_record_enabled = true;
-static uint64_t _min_time_cost = 1000; // us
-static int _max_call_depth = 3;
-static pthread_key_t _thread_key;
+static bool _call_record_enabled = true;    // 标记是否进行方法监听
+static uint64_t _min_time_cost = 1000;      // 监听最小时间（ us ）
+static int _max_call_depth = 3;             // 方法监听最大深度
+static smCallRecord *_smCallRecords;        // 记录监听数据
+static int _smRecordNum;                    // 记录 _smCallRecords 数量
+static int _smRecordAlloc;                  // 记录 _smCallRecords 已分配空间
+static pthread_key_t _thread_key;           // 绑定到线层数据的 key
 __unused static id (*orig_objc_msgSend)(id, SEL, ...);
 
-static smCallRecord *_smCallRecords;
-//static int otp_record_num;
-//static int otp_record_alloc;
-static int _smRecordNum;
-static int _smRecordAlloc;
+
+#pragma mark - 函数声明
+
+static void release_thread_call_stack(void *ptr);           // 释放 _thread_key 数据回调
+
+__attribute__((__naked__)) static void hook_Objc_msgSend(); // objc_msgSend 新实现
+
+#endif
+
+
+#pragma mark - Public
+
+/// 开始监听并进行 objc_msgSend 实现替换
+void smCallTraceStart(void) {
+#ifdef __aarch64__
+    _call_record_enabled = true;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        pthread_key_create(&_thread_key, &release_thread_call_stack);
+        rebind_symbols((struct rebinding[6]){
+            {"objc_msgSend", (void *)hook_Objc_msgSend, (void **)&orig_objc_msgSend},
+        }, 1);
+    });
+#endif
+}
+
+/// 停止监听
+void smCallTraceStop(void) {
+#ifdef __aarch64__
+    _call_record_enabled = false;
+#endif
+}
+
+/// 开始监听并设置最小耗时
+/// @param us 最小耗时 单位纳秒 us，默认 1000 us
+void smCallConfigMinTime(uint64_t us) {
+#ifdef __aarch64__
+    _min_time_cost = us;
+#endif
+}
+
+/// 开始监听并设置栈最大调用深度
+/// @param depth 栈最大调用深度，默认 3
+void smCallConfigMaxDepth(int depth) {
+#ifdef __aarch64__
+    _max_call_depth = depth;
+#endif
+}
+
+/// 回去方法耗时数据
+/// @param num 数据条数
+smCallRecord *smGetCallRecords(int *num) {
+#ifdef __aarch64__
+    if (num) {
+        *num = _smRecordNum;
+    }
+    return _smCallRecords;
+#else
+    if (num) {
+        *num = 0;
+    }
+    return NULL;
+#endif
+}
+
+/// 清空监听数据
+void smClearCallRecords(void) {
+#ifdef __aarch64__
+    if (_smCallRecords) {
+        free(_smCallRecords);
+        _smCallRecords = NULL;
+    }
+    _smRecordNum = 0;
+#endif
+}
+
+
+#pragma mark - Record
+
+// arm64架构又分为2种执行状态： AArch64 Application Level 和 AArch32 Application Level
+#ifdef __aarch64__
 
 typedef struct {
     id self;            // 通过 object_getClass 能够得到 Class 再通过 NSStringFromClass 能够得到类名
@@ -169,8 +246,8 @@ __asm volatile ("ldp x8, lr, [sp], #16\n");
 
 #define ret() __asm volatile ("ret\n");
 
-__attribute__((__naked__)) // 编译器不会生成入口代码和退出代码，写naked函数的时候要分外小心。进入函数代码时，父函数仅仅会将参数和返回地址压栈
-static void hook_Objc_msgSend() {
+// 编译器不会生成入口代码和退出代码，写naked函数的时候要分外小心。进入函数代码时，父函数仅仅会将参数和返回地址压栈
+__attribute__((__naked__)) static void hook_Objc_msgSend() {
     // Save parameters.
     save()
     
@@ -201,61 +278,5 @@ static void hook_Objc_msgSend() {
     // return
     ret()
 }
-
-
-#pragma mark public
-
-void smCallTraceStart(void) {
-    _call_record_enabled = true;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        pthread_key_create(&_thread_key, &release_thread_call_stack);
-        rebind_symbols((struct rebinding[6]){
-            {"objc_msgSend", (void *)hook_Objc_msgSend, (void **)&orig_objc_msgSend},
-        }, 1);
-    });
-}
-
-void smCallTraceStop(void) {
-    _call_record_enabled = false;
-}
-
-void smCallConfigMinTime(uint64_t us) {
-    _min_time_cost = us;
-}
-void smCallConfigMaxDepth(int depth) {
-    _max_call_depth = depth;
-}
-
-smCallRecord *smGetCallRecords(int *num) {
-    if (num) {
-        *num = _smRecordNum;
-    }
-    return _smCallRecords;
-}
-
-void smClearCallRecords(void) {
-    if (_smCallRecords) {
-        free(_smCallRecords);
-        _smCallRecords = NULL;
-    }
-    _smRecordNum = 0;
-}
-
-#else
-
-void smCallTraceStart(void) {}
-void smCallTraceStop(void) {}
-void smCallConfigMinTime(uint64_t us) {
-}
-void smCallConfigMaxDepth(int depth) {
-}
-smCallRecord *smGetCallRecords(int *num) {
-    if (num) {
-        *num = 0;
-    }
-    return NULL;
-}
-void smClearCallRecords(void) {}
 
 #endif
