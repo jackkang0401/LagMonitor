@@ -7,7 +7,6 @@
 //
 
 #import "SMClsCallCell.h"
-#import "Masonry.h"
 
 @interface SMClsCallCell()
 
@@ -27,28 +26,26 @@
 }
 
 - (void)buildUI {
-    [self addSubview:self.nameLb];
-    [self addSubview:self.desLb];
-    [self addSubview:self.pathLb];
-    [self.nameLb mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.left.equalTo(self).offset(10);
-        make.right.equalTo(self).offset(-10);
-    }];
-    [self.desLb mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.nameLb.mas_bottom).offset(10);
-        make.left.equalTo(self.nameLb);
-    }];
-    [self.pathLb mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.top.equalTo(self.desLb.mas_bottom).offset(10);
-        make.left.equalTo(self.nameLb);
-        make.right.equalTo(self).offset(-20);
-    }];
+    [self.contentView addSubview:self.nameLb];
+    [self.contentView addSubview:self.desLb];
+    [self.contentView addSubview:self.pathLb];
+    
+    CGFloat width = CGRectGetWidth(self.contentView.frame);
+    self.nameLb.frame = CGRectMake(10.f, 10.f, width-20.f, 16.f);
+    
+    CGFloat desY = CGRectGetMaxY(self.nameLb.frame)+10.f;
+    self.desLb.frame = CGRectMake(10.f, desY, width-20.f, 12.f);
+    
+    CGFloat pathY = CGRectGetMaxY(self.desLb.frame)+10.f;
+    self.pathLb.frame = CGRectMake(10, pathY, width-20.f, 12.f);
 }
 
 - (void)updateWithModel:(SMCallTraceTimeCostModel *)model {
     self.nameLb.text = [NSString stringWithFormat:@"[%@ %@]",model.className,model.methodName];
     self.desLb.text = [NSString stringWithFormat:@"频次:%lu 耗时:%f",(unsigned long)model.frequency, model.timeCost * 1000];
     self.pathLb.text = model.path;
+    CGRect frame = [model.path boundingRectWithSize:CGSizeMake([UIScreen mainScreen].bounds.size.width - 10*2, 999) options:NSStringDrawingUsesFontLeading | NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingTruncatesLastVisibleLine attributes:@{NSFontAttributeName:[UIFont systemFontOfSize:12]} context:nil];
+    self.pathLb.frame = CGRectMake(10, CGRectGetMinY(self.pathLb.frame), CGRectGetWidth(self.pathLb.frame), ceil(frame.size.height));
 }
 
 - (void)layoutSubviews {
@@ -64,6 +61,7 @@
     }
     return _nameLb;
 }
+
 - (UILabel *)desLb {
     if (!_desLb) {
         _desLb = [[UILabel alloc] init];
@@ -72,6 +70,7 @@
     }
     return _desLb;
 }
+
 - (UILabel *)pathLb {
     if (!_pathLb) {
         _pathLb = [[UILabel alloc] init];
@@ -81,4 +80,5 @@
     }
     return _pathLb;
 }
+
 @end

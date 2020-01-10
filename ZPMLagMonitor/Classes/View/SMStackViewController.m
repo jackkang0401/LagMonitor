@@ -9,7 +9,6 @@
 #import "SMStackViewController.h"
 #import "MJRefresh.h"
 #import "SMStackCell.h"
-#import "Masonry.h"
 #import "SMLagDB.h"
 
 static NSString *smStackCellIdentifier = @"smStackCell";
@@ -32,10 +31,6 @@ static NSString *smStackCellIdentifier = @"smStackCell";
     [self selectItems];
     [self.tbView registerClass:[UITableViewCell class] forCellReuseIdentifier:smStackCellIdentifier];
     [self.view addSubview:self.tbView];
-    [self.tbView mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.bottom.left.right.equalTo(self.view);
-        make.top.equalTo(self.view).offset(20);
-    }];
     self.navigationItem.rightBarButtonItems = @[self.clearBarButtonItem];
 }
 
@@ -64,12 +59,18 @@ static NSString *smStackCellIdentifier = @"smStackCell";
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
     return 1;
 }
+
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
     return self.listData.count;
 }
+
 - (CGFloat)tableView:(UITableView *)tableView heightForRowAtIndexPath:(NSIndexPath *)indexPath {
-    return 300;
+    SMCallStackModel *model = self.listData[indexPath.row];
+    CGRect frame = [model.stackStr boundingRectWithSize:CGSizeMake([UIScreen mainScreen].bounds.size.width - 10*2, 999) options:NSStringDrawingUsesFontLeading | NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingTruncatesLastVisibleLine attributes:@{NSFontAttributeName:[UIFont systemFontOfSize:12]} context:nil];
+    CGFloat height = 70.f + ceil(frame.size.height);
+    return height > 400.f ? 400.f : height;
 }
+
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:smStackCellIdentifier];
     cell.backgroundColor = [UIColor clearColor];
@@ -82,9 +83,7 @@ static NSString *smStackCellIdentifier = @"smStackCell";
         v.tag = 231876;
         if (cell) {
             [cell.contentView addSubview:v];
-            [v mas_makeConstraints:^(MASConstraintMaker *make) {
-                make.right.left.top.bottom.equalTo(cell.contentView);
-            }];
+            v.frame = cell.contentView.frame;
         }
     }
     
@@ -103,6 +102,7 @@ static NSString *smStackCellIdentifier = @"smStackCell";
 - (UITableView *)tbView {
     if (!_tbView) {
         _tbView = [[UITableView alloc] initWithFrame:CGRectZero];
+        _tbView.frame = CGRectMake(0, 0, CGRectGetWidth(self.view.frame), CGRectGetHeight(self.view.frame));
         _tbView.dataSource = self;
         _tbView.delegate = self;
         _tbView.backgroundColor = [UIColor clearColor];

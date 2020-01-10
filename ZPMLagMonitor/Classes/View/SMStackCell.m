@@ -7,7 +7,6 @@
 //
 
 #import "SMStackCell.h"
-#import "Masonry.h"
 
 @interface SMStackCell()
 
@@ -27,21 +26,18 @@
 }
 
 - (void)buildUI {
-    [self addSubview:self.contentLb];
-    [self addSubview:self.dateLb];
-    [self addSubview:self.infoLb];
-    [self.dateLb mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.top.equalTo(self).offset(10);
-    }];
-    [self.infoLb mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.dateLb.mas_right).offset(20);
-        make.top.equalTo(self.dateLb);
-    }];
-    [self.contentLb mas_makeConstraints:^(MASConstraintMaker *make) {
-        make.left.equalTo(self.dateLb).offset(10);
-        make.top.equalTo(self.dateLb.mas_bottom).offset(10);
-        make.right.bottom.equalTo(self).offset(-10);
-    }];
+    [self.contentView addSubview:self.dateLb];
+    [self.contentView addSubview:self.contentLb];
+    [self.contentView addSubview:self.infoLb];
+    
+    CGFloat width = CGRectGetWidth(self.contentView.frame);
+    self.dateLb.frame = CGRectMake(10.f, 10.f, width-20.f, 14.f);
+    
+    CGFloat infoY = CGRectGetMaxY(self.dateLb.frame) + 10.f;
+    self.infoLb.frame = CGRectMake(10.f, infoY, width-20.f, 14.f);
+    
+    CGFloat contentY = CGRectGetMaxY(self.infoLb.frame) + 10.f;
+    self.contentLb.frame = CGRectMake(10.f, contentY, width-20.f, 14.f);
 }
 
 - (void)updateWithModel:(SMCallStackModel *)model {
@@ -57,12 +53,11 @@
         self.infoLb.text = @"CPU负载高";
         self.infoLb.textColor = [UIColor orangeColor];
     }
+    CGRect frame = [model.stackStr boundingRectWithSize:CGSizeMake([UIScreen mainScreen].bounds.size.width - 10*2, 999) options:NSStringDrawingUsesFontLeading | NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingTruncatesLastVisibleLine attributes:@{NSFontAttributeName:[UIFont systemFontOfSize:12]} context:nil];
+     CGFloat height = 70.f + ceil(frame.size.height);
+     height = height > 400.f ? 400.f : height;
+    self.contentLb.frame = CGRectMake(10.f, CGRectGetMinY(self.contentLb.frame), CGRectGetWidth(self.contentLb.frame), height);
     
-}
-
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    self.contentLb.preferredMaxLayoutWidth = self.contentLb.frame.size.width;
 }
 
 #pragma mark - Getter
@@ -70,7 +65,7 @@
     if (!_contentLb) {
         _contentLb = [[UILabel alloc] init];
         _contentLb.numberOfLines = 0;
-        _contentLb.font = [UIFont systemFontOfSize:14];
+        _contentLb.font = [UIFont systemFontOfSize:14.f];
         _contentLb.textColor = [UIColor grayColor];
     }
     return _contentLb;
@@ -78,7 +73,7 @@
 - (UILabel *)dateLb {
     if (!_dateLb) {
         _dateLb = [[UILabel alloc] init];
-        _dateLb.font = [UIFont boldSystemFontOfSize:14];
+        _dateLb.font = [UIFont boldSystemFontOfSize:14.f];
         _dateLb.textColor = [UIColor grayColor];
     }
     return _dateLb;
@@ -86,7 +81,7 @@
 - (UILabel *)infoLb {
     if (!_infoLb) {
         _infoLb = [[UILabel alloc] init];
-        _infoLb.font = [UIFont boldSystemFontOfSize:14];
+        _infoLb.font = [UIFont boldSystemFontOfSize:14.f];
         _infoLb.textColor = [UIColor redColor];
     }
     return _infoLb;

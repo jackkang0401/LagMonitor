@@ -1,28 +1,10 @@
 PODS:
-  - AFNetworking (3.2.1):
-    - AFNetworking/NSURLSession (= 3.2.1)
-    - AFNetworking/Reachability (= 3.2.1)
-    - AFNetworking/Security (= 3.2.1)
-    - AFNetworking/Serialization (= 3.2.1)
-    - AFNetworking/UIKit (= 3.2.1)
-  - AFNetworking/NSURLSession (3.2.1):
-    - AFNetworking/Reachability
-    - AFNetworking/Security
-    - AFNetworking/Serialization
-  - AFNetworking/Reachability (3.2.1)
-  - AFNetworking/Security (3.2.1)
-  - AFNetworking/Serialization (3.2.1)
-  - AFNetworking/UIKit (3.2.1):
-    - AFNetworking/NSURLSession
   - FMDB (2.7.5):
     - FMDB/standard (= 2.7.5)
   - FMDB/standard (2.7.5)
-  - Masonry (1.1.0)
   - MJRefresh (3.3.1)
   - ZPMLagMonitor (0.1.0):
-    - AFNetworking
     - FMDB
-    - Masonry
     - MJRefresh
 
 DEPENDENCIES:
@@ -30,9 +12,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
-    - AFNetworking
     - FMDB
-    - Masonry
     - MJRefresh
 
 EXTERNAL SOURCES:
@@ -40,11 +20,9 @@ EXTERNAL SOURCES:
     :path: "../"
 
 SPEC CHECKSUMS:
-  AFNetworking: b6f891fdfaed196b46c7a83cf209e09697b94057
   FMDB: 2ce00b547f966261cd18927a3ddb07cb6f3db82a
-  Masonry: 678fab65091a9290e40e2832a55e7ab731aad201
   MJRefresh: eeda70fbf0ad277f3178cef1cd0c3532591d6237
-  ZPMLagMonitor: 5080fc10a7cf237a63c2eabe29550d53881e66cc
+  ZPMLagMonitor: dd5a04d9706e4aeac551976e3ccf9701856d018b
 
 PODFILE CHECKSUM: 032ee8aa6401e42a6d630a52a4a895dfa6dfd3a3
 
