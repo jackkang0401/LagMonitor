@@ -7,8 +7,9 @@
 //
 
 #include "SMCallTraceCore.h"
-// arm64架构又分为2种执行状态： AArch64 Application Level 和 AArch32 Application Level
-#ifdef __aarch64__
+
+// __aarch64__ arm64 架构又分为 2 种执行状态：AArch64 Application Level 和 AArch32 Application Level
+#if __arm64__
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,9 +37,9 @@ __unused static id (*orig_objc_msgSend)(id, SEL, ...);
 
 #pragma mark - 函数声明
 
-static void release_thread_call_stack(void *ptr);           // 释放 _thread_key 数据回调
+static void release_thread_call_stack(void *ptr);               // 释放 _thread_key 数据回调
 
-__attribute__((__naked__)) static void hook_Objc_msgSend(); // objc_msgSend 新实现
+__attribute__((__naked__)) static void hook_Objc_msgSend(void); // objc_msgSend 新实现
 
 #endif
 
@@ -47,7 +48,7 @@ __attribute__((__naked__)) static void hook_Objc_msgSend(); // objc_msgSend 新�
 
 /// 开始监听并进行 objc_msgSend 实现替换
 void smCallTraceStart(void) {
-#ifdef __aarch64__
+#if __arm64__
     _call_record_enabled = true;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -61,7 +62,7 @@ void smCallTraceStart(void) {
 
 /// 停止监听
 void smCallTraceStop(void) {
-#ifdef __aarch64__
+#if __arm64__
     _call_record_enabled = false;
 #endif
 }
@@ -69,7 +70,7 @@ void smCallTraceStop(void) {
 /// 开始监听并设置最小耗时
 /// @param us 最小耗时 单位纳秒 us，默认 1000 us
 void smCallConfigMinTime(uint64_t us) {
-#ifdef __aarch64__
+#if __arm64__
     _min_time_cost = us;
 #endif
 }
@@ -77,7 +78,7 @@ void smCallConfigMinTime(uint64_t us) {
 /// 开始监听并设置栈最大调用深度
 /// @param depth 栈最大调用深度，默认 3
 void smCallConfigMaxDepth(int depth) {
-#ifdef __aarch64__
+#if __arm64__
     _max_call_depth = depth;
 #endif
 }
@@ -85,7 +86,7 @@ void smCallConfigMaxDepth(int depth) {
 /// 回去方法耗时数据
 /// @param num 数据条数
 smCallRecord *smGetCallRecords(int *num) {
-#ifdef __aarch64__
+#if __arm64__
     if (num) {
         *num = _smRecordNum;
     }
@@ -100,7 +101,7 @@ smCallRecord *smGetCallRecords(int *num) {
 
 /// 清空监听数据
 void smClearCallRecords(void) {
-#ifdef __aarch64__
+#if __arm64__
     if (_smCallRecords) {
         free(_smCallRecords);
         _smCallRecords = NULL;
@@ -113,7 +114,7 @@ void smClearCallRecords(void) {
 #pragma mark - Record
 
 // arm64架构又分为2种执行状态： AArch64 Application Level 和 AArch32 Application Level
-#ifdef __aarch64__
+#if __arm64__
 
 typedef struct {
     id self;            // 通过 object_getClass 能够得到 Class 再通过 NSStringFromClass 能够得到类名
