@@ -9,7 +9,7 @@
 #include "SMCallTraceCore.h"
 
 // __aarch64__ arm64 架构又分为 2 种执行状态：AArch64 Application Level 和 AArch32 Application Level
-#if __arm64__
+#if __arm64__  ||  (__x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,7 +48,7 @@ __attribute__((__naked__)) static void hook_Objc_msgSend(void); // objc_msgSend 
 
 /// 开始监听并进行 objc_msgSend 实现替换
 void smCallTraceStart(void) {
-#if __arm64__
+#if __arm64__ //  ||  (__x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC)
     _call_record_enabled = true;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -62,7 +62,7 @@ void smCallTraceStart(void) {
 
 /// 停止监听
 void smCallTraceStop(void) {
-#if __arm64__
+#if __arm64__  ||  (__x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC)
     _call_record_enabled = false;
 #endif
 }
@@ -70,7 +70,7 @@ void smCallTraceStop(void) {
 /// 开始监听并设置最小耗时
 /// @param us 最小耗时 单位纳秒 us，默认 1000 us
 void smCallConfigMinTime(uint64_t us) {
-#if __arm64__
+#if __arm64__  ||  (__x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC)
     _min_time_cost = us;
 #endif
 }
@@ -78,7 +78,7 @@ void smCallConfigMinTime(uint64_t us) {
 /// 开始监听并设置栈最大调用深度
 /// @param depth 栈最大调用深度，默认 3
 void smCallConfigMaxDepth(int depth) {
-#if __arm64__
+#if __arm64__  ||  (__x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC)
     _max_call_depth = depth;
 #endif
 }
@@ -86,7 +86,7 @@ void smCallConfigMaxDepth(int depth) {
 /// 回去方法耗时数据
 /// @param num 数据条数
 smCallRecord *smGetCallRecords(int *num) {
-#if __arm64__
+#if __arm64__  ||  (__x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC)
     if (num) {
         *num = _smRecordNum;
     }
@@ -101,7 +101,7 @@ smCallRecord *smGetCallRecords(int *num) {
 
 /// 清空监听数据
 void smClearCallRecords(void) {
-#if __arm64__
+#if __arm64__  ||  (__x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC)
     if (_smCallRecords) {
         free(_smCallRecords);
         _smCallRecords = NULL;
@@ -114,7 +114,7 @@ void smClearCallRecords(void) {
 #pragma mark - Record
 
 // arm64架构又分为2种执行状态： AArch64 Application Level 和 AArch32 Application Level
-#if __arm64__
+#if __arm64__  ||  (__x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC)
 
 typedef struct {
     id self;            // 通过 object_getClass 能够得到 Class 再通过 NSStringFromClass 能够得到类名
@@ -151,25 +151,25 @@ static void release_thread_call_stack(void *ptr) {
     free(cs);
 }
 
-static inline void push_call_record(id _self, Class _cls, SEL _cmd, uintptr_t lr) {
+static inline uintptr_t push_call_record(id _self, Class _cls, SEL _cmd, uintptr_t lr) {
     thread_call_stack *cs = get_thread_call_stack();
-    if (cs) {
-        int nextIndex = (++cs->index);
-        if (nextIndex >= cs->allocated_length) {
-            cs->allocated_length += 64;
-            cs->stack = (thread_call_record *)realloc(cs->stack, cs->allocated_length * sizeof(thread_call_record));
-        }
-        thread_call_record *newRecord = &cs->stack[nextIndex];
-        newRecord->self = _self;
-        newRecord->cls = _cls;
-        newRecord->cmd = _cmd;
-        newRecord->lr = lr;
-        if (cs->is_main_thread && _call_record_enabled) {
-            struct timeval now;
-            gettimeofday(&now, NULL);
-            newRecord->time = (now.tv_sec % 100) * 1000000 + now.tv_usec;
-        }
+    int nextIndex = (++cs->index);
+    if (nextIndex >= cs->allocated_length) {
+        cs->allocated_length += 64;
+        cs->stack = (thread_call_record *)realloc(cs->stack, cs->allocated_length * sizeof(thread_call_record));
     }
+    thread_call_record *newRecord = &cs->stack[nextIndex];
+    newRecord->self = _self;
+    newRecord->cls = _cls;
+    newRecord->cmd = _cmd;
+    newRecord->lr = lr;
+    if (cs->is_main_thread && _call_record_enabled) {
+        struct timeval now;
+        gettimeofday(&now, NULL);
+        newRecord->time = (now.tv_sec % 100) * 1000000 + now.tv_usec;
+    }
+    // 返回原始实现
+    return (uintptr_t)orig_objc_msgSend;
 }
 
 static inline uintptr_t pop_call_record() {
@@ -206,8 +206,8 @@ static inline uintptr_t pop_call_record() {
     return pRecord->lr;
 }
 
-void before_objc_msgSend(id self, SEL _cmd, uintptr_t lr) {
-    push_call_record(self, object_getClass(self), _cmd, lr);
+uintptr_t before_objc_msgSend(id self, SEL _cmd, uintptr_t lr) {
+    return push_call_record(self, object_getClass(self), _cmd, lr);
 }
 
 // 返回 lr 的值
@@ -215,69 +215,90 @@ uintptr_t after_objc_msgSend() {
     return pop_call_record();
 }
 
+#endif
 
-#define call(b, value) \
-__asm volatile ("stp x8, x9, [sp, #-16]!\n"); \
-__asm volatile ("mov x12, %0\n" :: "r"(value)); \
-__asm volatile ("ldp x8, x9, [sp], #16\n"); \
-__asm volatile (#b " x12\n");
+#if __arm64__
 
-#define save() \
-__asm volatile ( \
-"stp x8, x9, [sp, #-16]!\n" \
-"stp x6, x7, [sp, #-16]!\n" \
-"stp x4, x5, [sp, #-16]!\n" \
-"stp x2, x3, [sp, #-16]!\n" \
-"stp x0, x1, [sp, #-16]!\n");
-
-#define load() \
-__asm volatile ( \
-"ldp x0, x1, [sp], #16\n" \
-"ldp x2, x3, [sp], #16\n" \
-"ldp x4, x5, [sp], #16\n" \
-"ldp x6, x7, [sp], #16\n" \
-"ldp x8, x9, [sp], #16\n" );
-
-#define link(b, value) \
-__asm volatile ("stp x8, lr, [sp, #-16]!\n"); \
-__asm volatile ("sub sp, sp, #16\n"); \
-call(b, value); \
-__asm volatile ("add sp, sp, #16\n"); \
-__asm volatile ("ldp x8, lr, [sp], #16\n");
-
-#define ret() __asm volatile ("ret\n");
-
-// 编译器不会生成入口代码和退出代码，写naked函数的时候要分外小心。进入函数代码时，父函数仅仅会将参数和返回地址压栈
+#pragma mark - 64 位真机实现
 __attribute__((__naked__)) static void hook_Objc_msgSend() {
-    // Save parameters.
-    save()
-    
-    __asm volatile ("mov x2, lr\n");
-    __asm volatile ("mov x3, x4\n");
-    
-    // Call our before_objc_msgSend.
-    call(blr, &before_objc_msgSend)
-    
-    // Load parameters.
-    load()
-    
-    // Call through to the original objc_msgSend.
-    call(blr, orig_objc_msgSend)
-    
-    // Save original objc_msgSend return value.
-    save()
-    
-    // Call our after_objc_msgSend.
-    call(blr, &after_objc_msgSend)
-    
-    // restore lr
-    __asm volatile ("mov lr, x0\n");
-    
-    // Load original objc_msgSend return value.
-    load()
-    
+    // save parameter registers: x0..x8, q0..q7
+    __asm volatile (
+                    "stp q0, q1, [sp, #-32]!\n"
+                    "stp q2, q3, [sp, #-32]!\n"
+                    "stp q4, q5, [sp, #-32]!\n"
+                    "stp q6, q7, [sp, #-32]!\n"
+                    "stp x0, x1, [sp, #-16]!\n"
+                    "stp x2, x3, [sp, #-16]!\n"
+                    "stp x4, x5, [sp, #-16]!\n"
+                    "stp x6, x7, [sp, #-16]!\n"
+                    "str x8,     [sp, #-16]!\n"
+                    );
+
+    __asm volatile (
+                    "mov x2, lr\n"
+                    "bl _before_objc_msgSend\n"
+                    );
+
+    // restore registers
+    __asm volatile (
+                    "ldr x8,     [sp], #16\n"
+                    "ldp x6, x7, [sp], #16\n"
+                    "ldp x4, x5, [sp], #16\n"
+                    "ldp x2, x3, [sp], #16\n"
+                    "ldp x0, x1, [sp], #16\n"
+                    "ldp q6, q7, [sp], #32\n"
+                    "ldp q4, q5, [sp], #32\n"
+                    "ldp q2, q3, [sp], #32\n"
+                    "ldp q0, q1, [sp], #32\n"
+                    );
+
+    // objc_msgSend
+    __asm volatile ("mov x12, %0\n" :: "r"(orig_objc_msgSend));
+    __asm volatile ("blr x12\n");
+
+    // save parameter registers: x0..x8, q0..q7
+    __asm volatile (
+                    "stp q0, q1, [sp, #-32]!\n"
+                    "stp q2, q3, [sp, #-32]!\n"
+                    "stp q4, q5, [sp, #-32]!\n"
+                    "stp q6, q7, [sp, #-32]!\n"
+                    "stp x0, x1, [sp, #-16]!\n"
+                    "stp x2, x3, [sp, #-16]!\n"
+                    "stp x4, x5, [sp, #-16]!\n"
+                    "stp x6, x7, [sp, #-16]!\n"
+                    "str x8,     [sp, #-16]!\n"
+                    );
+
+    __asm volatile (
+                    "bl _after_objc_msgSend\n"
+                    "mov lr, x0\n"
+                    );
+
+    // restore registers
+    __asm volatile (
+                    "ldr x8,     [sp], #16\n"
+                    "ldp x6, x7, [sp], #16\n"
+                    "ldp x4, x5, [sp], #16\n"
+                    "ldp x2, x3, [sp], #16\n"
+                    "ldp x0, x1, [sp], #16\n"
+                    "ldp q6, q7, [sp], #32\n"
+                    "ldp q4, q5, [sp], #32\n"
+                    "ldp q2, q3, [sp], #32\n"
+                    "ldp q0, q1, [sp], #32\n"
+                    );
+
     // return
-    ret()
+    __asm volatile ("ret\n");
+}
+
+#endif
+
+#if __x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC
+
+#pragma mark - 64 位模拟器实现
+__attribute__((__naked__)) static void hook_Objc_msgSend() {
+    
+    
 }
 
 #endif
