@@ -27,7 +27,7 @@
     
     [self test1];
     
-    [self test10];
+    //[self test10];
 }
 
 - (void)viewDidAppear:(BOOL)animated{

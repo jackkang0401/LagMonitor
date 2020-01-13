@@ -48,7 +48,7 @@ __attribute__((__naked__)) static void hook_Objc_msgSend(void); // objc_msgSend 
 
 /// 开始监听并进行 objc_msgSend 实现替换
 void smCallTraceStart(void) {
-#if __arm64__ //  ||  (__x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC)
+#if __arm64__  ||  (__x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC)
     _call_record_enabled = true;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -296,9 +296,124 @@ __attribute__((__naked__)) static void hook_Objc_msgSend() {
 #if __x86_64__  &&  TARGET_OS_SIMULATOR  &&  !TARGET_OS_IOSMAC
 
 #pragma mark - 64 位模拟器实现
+
+/*
+    因为执行函数调用前会将调用者的下一条指令压入栈中，而被调用者函数内部因为有本地栈帧(stack frame)
+ 的定义又会将栈顶下移，所以在被调用者函数执行ret指令返回之前需要确保当前堆栈寄存器SP所指向的栈顶地址要
+ 和被调用函数执行前的栈顶地址保持一致，不然当ret指令执行时取出的调用者的下一条指令的值将是错误的，从而
+ 会产生崩溃异常
+ */
+
 __attribute__((__naked__)) static void hook_Objc_msgSend() {
     
+    __asm volatile (
+                    "subq       $(0x80+0x8), %rsp\n"
+                    
+                    "movdqa     %xmm0, (%rsp)\n"
+                    "movdqa     %xmm1, 0x10(%rsp)\n"
+                    "movdqa     %xmm2, 0x20(%rsp)\n"
+                    "movdqa     %xmm3, 0x30(%rsp)\n"
+                    "movdqa     %xmm4, 0x40(%rsp)\n"
+                    "movdqa     %xmm5, 0x50(%rsp)\n"
+                    "movdqa     %xmm6, 0x60(%rsp)\n"
+                    "movdqa     %xmm7, 0x70(%rsp)\n"
+                    "pushq      %rax\n"
+                    "pushq      %r9\n"
+                    "pushq      %r8\n"
+                    "pushq      %rcx\n"
+                    "pushq      %rdx\n"
+                    "pushq      %rsi\n"
+                    "pushq      %rdi\n"
+                    "pushq      %rax\n"
+                    );
     
+    __asm volatile (
+                    "call       _before_objc_msgSend\n"
+                    "movq       %rax, %r10\n"
+                    );
+
+    __asm volatile (
+                    "pop        %rax\n"
+                    "pop        %rdi\n"
+                    "pop        %rsi\n"
+                    "pop        %rdx\n"
+                    "pop        %rcx\n"
+                    "pop        %r8\n"
+                    "pop        %r9\n"
+                    "pop        %rax\n"
+                    "movdqa     (%rsp), %xmm0\n"
+                    "movdqa     0x10(%rsp), %xmm1\n"
+                    "movdqa     0x20(%rsp), %xmm2\n"
+                    "movdqa     0x30(%rsp), %xmm3\n"
+                    "movdqa     0x40(%rsp), %xmm4\n"
+                    "movdqa     0x50(%rsp), %xmm5\n"
+                    "movdqa     0x60(%rsp), %xmm6\n"
+                    "movdqa     0x70(%rsp), %xmm7\n"
+                    
+                    "addq       $(16*8+8),  %rsp\n"
+                    );
+
+    // objc_msgSend
+    __asm volatile ("jmpq       *%r10\n");
+    //__asm volatile ("callq       *%0\n" :: "r"(orig_objc_msgSend));
+
+    __asm volatile (
+                    "pushq      %r10\n"
+                    "push       %rbp\n"
+                    "movq       %rsp, %rbp\n"
+                    
+                    "subq       $(0x80), %rsp\n"
+                    "movdqa     %xmm0, -0x80(%rbp)\n"
+                    "push       %rax\n"
+                    "movdqa     %xmm1, -0x70(%rbp)\n"
+                    "push       %rdi\n"
+                    "movdqa     %xmm2, -0x60(%rbp)\n"
+                    "push       %rsi\n"
+                    "movdqa     %xmm3, -0x50(%rbp)\n"
+                    "push       %rdx\n"
+                    "movdqa     %xmm4, -0x40(%rbp)\n"
+                    "push       %rcx\n"
+                    "movdqa     %xmm5, -0x30(%rbp)\n"
+                    "push       %r8\n"
+                    "movdqa     %xmm6, -0x20(%rbp)\n"
+                    "push       %r9\n"
+                    "movdqa     %xmm7, -0x10(%rbp)\n"
+                    
+                    "pushq      0x8(%rbp)\n"
+                    "movq       %rbp, %rax\n"
+                    "addq       $8, %rax\n"
+                    "pushq      %rax\n"
+                    );
+
+    __asm volatile (
+                    "call       _after_objc_msgSend\n"
+                    );
+    
+    __asm volatile (
+                    "pop        %rax\n"
+                    "pop        8(%rbp)\n"
+                    
+                    "movdqa     -0x80(%rbp), %xmm0\n"
+                    "pop        %r9\n"
+                    "movdqa     -0x70(%rbp), %xmm1\n"
+                    "pop        %r8\n"
+                    "movdqa     -0x60(%rbp), %xmm2\n"
+                    "pop        %rcx\n"
+                    "movdqa     -0x50(%rbp), %xmm3\n"
+                    "pop        %rdx\n"
+                    "movdqa     -0x40(%rbp), %xmm4\n"
+                    "pop        %rsi\n"
+                    "movdqa     -0x30(%rbp), %xmm5\n"
+                    "pop        %rdi\n"
+                    "movdqa     -0x20(%rbp), %xmm6\n"
+                    "pop        %rax\n"
+                    "movdqa     -0x10(%rbp), %xmm7\n"
+                    
+                    "leave\n"
+                    "movq       %r10, (%rsp)\n"
+                    );
+
+    __asm volatile ("ret\n");
 }
 
 #endif
