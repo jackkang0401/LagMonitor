@@ -298,13 +298,68 @@ __attribute__((__naked__)) static void hook_Objc_msgSend() {
 #pragma mark - 64 位模拟器实现
 
 /*
-    因为执行函数调用前会将调用者的下一条指令压入栈中，而被调用者函数内部因为有本地栈帧(stack frame)
- 的定义又会将栈顶下移，所以在被调用者函数执行ret指令返回之前需要确保当前堆栈寄存器SP所指向的栈顶地址要
- 和被调用函数执行前的栈顶地址保持一致，不然当ret指令执行时取出的调用者的下一条指令的值将是错误的，从而
- 会产生崩溃异常
+    栈基址指针 %rbp 始终指向当前函数调用开始时栈的位置，栈指针 %rsp 始终指向栈中最新的元素对应的
+ 位置， %rbp 和 %rsp 之间的元素被我们成为”栈帧”
+ 
+    因为执行函数调用前会将调用者的下一条指令压入栈中，而被调用者函数内部因为有本地栈帧的定义又会将
+ 栈顶下移，所以在被调用者函数执行ret指令返回之前需要确保当前堆栈寄存器 %rsp 所指向的栈顶地址要和
+ 被调用函数执行前的栈顶地址保持一致，不然当ret指令执行时取出的调用者的下一条指令的值将是错误的，从
+ 而会产生崩溃异常
  */
 
 __attribute__((__naked__)) static void hook_Objc_msgSend() {
+    
+//    __asm volatile (
+//                    "pushq  %rbp\n"
+//                    "movq   %rsp, %rbp\n"
+//                    "subq   $0x88, %rsp\n"
+//                    "movdqa %xmm0, -0x80(%rbp)\n"
+//                    "pushq  %rax\n"
+//                    "movdqa %xmm1, -0x70(%rbp)\n"
+//                    "pushq  %rdi\n"
+//                    "movdqa %xmm2, -0x60(%rbp)\n"
+//                    "pushq  %rsi\n"
+//                    "movdqa %xmm3, -0x50(%rbp)\n"
+//                    "pushq  %rdx\n"
+//                    "movdqa %xmm4, -0x40(%rbp)\n"
+//                    "pushq  %rcx\n"
+//                    "movdqa %xmm5, -0x30(%rbp)\n"
+//                    "pushq  %r8\n"
+//                    "movdqa %xmm6, -0x20(%rbp)\n"
+//                    "pushq  %r9\n"
+//                    "movdqa %xmm7, -0x10(%rbp)\n"
+//                    );
+//
+//    __asm volatile (
+//                    "movq       0x8(%rbp), %rdx\n"      // 返回地址
+//                    "call       _before_objc_msgSend\n"
+//                    "movq       %rax, %r11\n"
+//                    );
+//
+//    __asm volatile (
+//                    "movdqa -0x80(%rbp), %xmm0\n"
+//                    "popq   %r9\n"
+//                    "movdqa -0x70(%rbp), %xmm1\n"
+//                    "popq   %r8\n"
+//                    "movdqa -0x60(%rbp), %xmm2\n"
+//                    "popq   %rcx\n"
+//                    "movdqa -0x50(%rbp), %xmm3\n"
+//                    "popq   %rdx\n"
+//                    "movdqa -0x40(%rbp), %xmm4\n"
+//                    "popq   %rsi\n"
+//                    "movdqa -0x30(%rbp), %xmm5\n"
+//                    "popq   %rdi\n"
+//                    "movdqa -0x20(%rbp), %xmm6\n"
+//                    "popq   %rax\n"
+//                    "movdqa -0x10(%rbp), %xmm7\n"
+//                    "testq  %r11, %r11\n"
+//                    "leave\n"
+//                    );
+//
+//    // objc_msgSend
+//    __asm volatile ("addq   $0x8, %rsp\n");
+//    __asm volatile ("call       *%r11\n");
+    
     
     __asm volatile (
                     "subq       $(0x80+0x8), %rsp\n"
