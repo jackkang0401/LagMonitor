@@ -10,6 +10,13 @@
 
 @implementation SMCallTraceTimeCostModel
 
+- (NSMutableArray <SMCallTraceTimeCostModel *> *)subCosts{
+    if(!_subCosts){
+        _subCosts = [[NSMutableArray alloc] init];
+    }
+    return _subCosts;
+}
+
 - (NSString *)des {
     NSMutableString *str = [NSMutableString new];
     [str appendFormat:@"%2d| ",(int)_callDepth];
@@ -19,6 +26,15 @@
     }
     [str appendFormat:@"%s[%@ %@]", (_isClassMethod ? "+" : "-"), _className, _methodName];
     return str;
+}
+
+- (NSString *)description{
+    NSString *string = [NSString stringWithFormat:@"%@-%@",self.methodName,@(self.callDepth)];
+    for (SMCallTraceTimeCostModel *model in self.subCosts) {
+        NSString *subString = [NSString stringWithFormat:@"%@",model];
+        [string stringByAppendingFormat:@"\n %@",subString];
+    }
+    return string;
 }
 
 @end

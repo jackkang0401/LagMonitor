@@ -18,7 +18,7 @@
 @property (nonatomic, copy) NSString *path;              //路径
 @property (nonatomic, assign) BOOL lastCall;             //是否是最后一个 Call
 @property (nonatomic, assign) NSUInteger frequency;      //访问频次
-@property (nonatomic, strong) NSArray <SMCallTraceTimeCostModel *> *subCosts;
+@property (nonatomic, strong) NSMutableArray <SMCallTraceTimeCostModel *> *subCosts;
 
 - (NSString *)des;
 
