@@ -42,7 +42,7 @@
 
 + (void)save {
     NSMutableString *mStr = [NSMutableString new];
-    NSArray<SMCallTraceTimeCostModel *> *arr = [self loadRecords];
+    NSArray<SMCallTraceTimeCostModel *> *arr = [self loadRecords1];
     for (SMCallTraceTimeCostModel *model in arr) {
         //记录方法路径
         model.path = [NSString stringWithFormat:@"[%@ %@]",model.className,model.methodName];
@@ -75,10 +75,8 @@
     }
     
 }
+
 + (NSArray<SMCallTraceTimeCostModel *>*)loadRecords {
-    
-    // return [self loadCallRecords];
-    
     // 获得前序序列（深度优先遍历）
     NSMutableArray<SMCallTraceTimeCostModel *> *arr = [NSMutableArray new];
     int num = 0;
@@ -114,115 +112,98 @@
     return arr;
 }
 
-//+ (NSArray<SMCallTraceTimeCostModel *>*)loadCallRecords {
-//    // 获得前序序列（深度优先遍历）
-//    NSMutableArray<SMCallTraceTimeCostModel *> *arr = [NSMutableArray new];
-//    int num = 0;
-//    smCallRecord *records = smGetCallRecords(&num);
-//
-//    if (0 == num){
-//        return arr;
-//    }
-//
-//    NSMutableArray *rootArray = [NSMutableArray new];
-//    smCallRecord *rd = &records[num-1];
-//    NSInteger rootDepth = rd->depth;
-//
-//    for (int i = num-1; i >= 0 ; i--) {
-//        smCallRecord *rd = &records[i];
-//        SMCallTraceTimeCostModel *model = [SMCallTraceTimeCostModel new];
-//        model.className = NSStringFromClass(rd->cls);
-//        model.methodName = NSStringFromSelector(rd->sel);
-//        model.isClassMethod = class_isMetaClass(rd->cls);
-//        model.timeCost = (double)rd->time / 1000000.0; // s
-//        model.callDepth = rd->depth;
-//        model.index = i;
-//        NSLog(@"%@-%@",model.methodName,@(model.callDepth));
-//        [arr addObject:model];
-//        if (rootDepth == model.callDepth) {
-//            [rootArray addObject:model];
-//        }
-//    }
-//    // 计算各个栈的范围
-//    NSInteger rootCount = rootArray.count;
-//    NSMutableArray *rangeArray = [NSMutableArray new];
-//
-//    if (rootCount <= 1 ) {
-//        NSRange range = NSMakeRange(0, arr.count);
-//        NSValue *value = [NSValue valueWithRange:range];
-//        [rangeArray addObject:value];
-//    }
-//    else{
-//        for (int i = 0; i < rootCount-1; i++) {
-//            SMCallTraceTimeCostModel *model = rootArray[i];
-//            SMCallTraceTimeCostModel *nextModel = rootArray[i+1];
-//            NSInteger lengh = nextModel.index - model.index;
-//            NSRange range = NSMakeRange(model.index, lengh);
-//            NSValue *value = [NSValue valueWithRange:range];
-//            [rangeArray addObject:value];
-//            if (i == (rootCount-2)) {
-//                NSInteger lengh = num - model.index;
-//                NSRange range = NSMakeRange(model.index, lengh);
-//                NSValue *value = [NSValue valueWithRange:range];
-//                [rangeArray addObject:value];
-//            }
-//        }
-//    }
-//
-//
-//    [rootArray removeAllObjects];
-//    for (NSValue *value in rootArray) {
-//        NSRange range = [value rangeValue];
-//        SMCallTraceTimeCostModel *rootModel = [self createTreeWithCallArray:arr range:range];
-//        [rootArray addObject:rootModel];
-//    }
-//}
-//
-//+ (SMCallTraceTimeCostModel *)createTreeWithCallArray:(NSArray<SMCallTraceTimeCostModel *> *)callArray
-//                                                           range:(NSRange)range{
-//    NSInteger allNodeCount = callArray.count;
-//    if (allNodeCount <= (rootIndex+1)) {
-//        return callArray;
-//    }
-//
-//    SMCallTraceTimeCostModel *rootNode = callArray[rootIndex];
-//    NSInteger lastRootIndex = -1;
-//
-//    // 第一个树的
-//    for (NSInteger i = rootIndex; i < allNodeCount-1; i++) {
-//        SMCallTraceTimeCostModel *currentNode = callArray[i];
-//        if (currentNode.callDepth >= 0) {
-//            // 查找叶子节点
-//            for (NSUInteger j = i+1; j < allNodeCount-1; j++) {
-//                SMCallTraceTimeCostModel *successorNode = callArray[j];
-//                //当前 currentNode 的叶子节点已经查找完毕，结束此次查找
-//                if(currentNode.callDepth <= successorNode.callDepth){
-//                    break;
-//                }
-//                if ((successorNode.callDepth + 1) == currentNode.callDepth) {
-//                    [currentNode.subCosts insertObject:successorNode atIndex:0];
-//                }
-//            }
-//        }
-//        // 说明有多个树
-//        if (rootIndex != i && rootNode.callDepth == currentNode.callDepth) {
-//            lastRootIndex = i;
-//            break;
-//        }
-//    }
-//
-//    // 生成下一个树
-//    if (-1 != lastRootIndex) {
-//        NSArray *lastArray = [self createTreeWithCallArray:callArray rootIndex:lastRootIndex];
-//        NSMutableArray *rootArray = [[NSMutableArray alloc] init];
-//        [rootArray addObject:rootNode];
-//        if (lastArray.count>0) {
-//            [rootArray addObjectsFromArray:lastArray];
-//        }
-//        return [rootArray copy];
-//    }
-//    return @[rootNode];
-//}
++ (NSArray<SMCallTraceTimeCostModel *>*)loadRecords1 {
+    // 获得前序序列（深度优先遍历）
+    NSMutableArray<SMCallTraceTimeCostModel *> *arr = [NSMutableArray new];
+    int num = 0;
+    smCallRecord *records = smGetCallRecords(&num);
+
+    if (0 == num){
+        return arr;
+    }
+
+    NSMutableArray *rootArray = [NSMutableArray new];
+    smCallRecord *rd = &records[num-1];
+    NSInteger rootDepth = rd->depth;
+
+    for (int i = num-1; i >= 0 ; i--) {
+        smCallRecord *rd = &records[i];
+        SMCallTraceTimeCostModel *model = [SMCallTraceTimeCostModel new];
+        model.className = NSStringFromClass(rd->cls);
+        model.methodName = NSStringFromSelector(rd->sel);
+        model.isClassMethod = class_isMetaClass(rd->cls);
+        model.timeCost = (double)rd->time / 1000000.0; // s
+        model.callDepth = rd->depth;
+        model.index = i;
+        NSLog(@"%@-%@",model.methodName,@(model.callDepth));
+        [arr addObject:model];
+        if (rootDepth == model.callDepth) {
+            [rootArray addObject:model];
+        }
+    }
+    // 计算各个栈的范围
+    NSInteger rootCount = rootArray.count;
+    NSMutableArray *rangeArray = [NSMutableArray new];
+
+    if (rootCount <= 1 ) {
+        NSRange range = NSMakeRange(0, arr.count);
+        NSValue *value = [NSValue valueWithRange:range];
+        [rangeArray addObject:value];
+    }
+    else{
+        for (int i = 0; i < rootCount-1; i++) {
+            SMCallTraceTimeCostModel *model = rootArray[i];
+            SMCallTraceTimeCostModel *nextModel = rootArray[i+1];
+            NSInteger lengh = nextModel.index - model.index;
+            NSRange range = NSMakeRange(model.index, lengh);
+            NSValue *value = [NSValue valueWithRange:range];
+            [rangeArray addObject:value];
+            if (i == (rootCount-2)) {
+                NSInteger lengh = num - model.index;
+                NSRange range = NSMakeRange(model.index, lengh);
+                NSValue *value = [NSValue valueWithRange:range];
+                [rangeArray addObject:value];
+            }
+        }
+    }
+
+
+    [rootArray removeAllObjects];
+    for (NSValue *value in rangeArray) {
+        NSRange range = [value rangeValue];
+        SMCallTraceTimeCostModel *rootModel = [self createTreeWithCallArray:arr range:range];
+        if (rootModel) {
+            [rootArray addObject:rootModel];
+        }
+    }
+    return rootArray;
+}
+
++ (SMCallTraceTimeCostModel *)createTreeWithCallArray:(NSArray<SMCallTraceTimeCostModel *> *)callArray
+                                                           range:(NSRange)range{
+    if ((range.location+range.length) > callArray.count) {
+        return nil;
+    }
+    SMCallTraceTimeCostModel *rootNode = callArray[range.location];
+    // 第一个树的
+    for (NSInteger i = range.location; i < (range.location+range.length); i++) {
+        SMCallTraceTimeCostModel *currentNode = callArray[i];
+        if (currentNode.callDepth >= 0) {
+            // 查找叶子节点
+            for (NSUInteger j = i+1; j < (range.location+range.length); j++) {
+                SMCallTraceTimeCostModel *successorNode = callArray[j];
+                if(currentNode.callDepth >= successorNode.callDepth){
+                    //当前 currentNode 的叶子节点已经查找完毕，结束此次查找
+                    break;
+                }
+                if (currentNode.callDepth == (successorNode.callDepth - 1)) {
+                    [currentNode.subCosts insertObject:successorNode atIndex:0];
+                }
+            }
+        }
+    }
+    return rootNode;
+}
 
 
 @end
