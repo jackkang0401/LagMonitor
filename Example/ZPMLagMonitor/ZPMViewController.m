@@ -23,16 +23,20 @@
 	// Do any additional setup after loading the view, typically from a nib.
     
     
-    [SMCallTrace start];
     
-    [self test1];
     
-    //[self test10];
+
 }
 
-- (void)viewDidAppear:(BOOL)animated{
-    [super viewDidAppear:animated];
-    [SMCallTrace stopSaveAndClean];
+- (void)viewWillAppear:(BOOL)animated{
+    [super viewWillAppear:animated];
+    
+}
+
+
+- (void)viewWillDisappear:(BOOL)animated{
+    [super viewWillDisappear:animated];
+    
 }
 
 - (void)test1{
@@ -69,5 +73,28 @@
     SMStackViewController *sVC = [[SMStackViewController alloc] init];
     [self.navigationController pushViewController:sVC animated:YES];
 }
+
+- (IBAction)startAction:(UIButton *)btn {
+    if (btn.isSelected) {
+        [SMCallTrace stopSaveAndClean];
+    }
+    else{
+        [SMCallTrace start];
+    }
+    btn.selected = !btn.isSelected;
+}
+
+- (IBAction)test1Action:(UIButton *)sender {
+    [self test1];
+}
+
+- (IBAction)test2Action:(UIButton *)sender {
+    [self test2];
+}
+
+- (IBAction)test3Action:(UIButton *)sender {
+    [self test3];
+}
+
 
 @end

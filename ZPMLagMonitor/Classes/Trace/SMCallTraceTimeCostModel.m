@@ -38,7 +38,7 @@
     // 类方法/普通方法
     str = [str stringByAppendingFormat:@" %@ ",self.isClassMethod?@"+":@"-"];
     // 类名、方法、包含方法数
-    str = [str stringByAppendingFormat:@"[%@ %@] %@ ",self.className,self.methodName,@(self.timeCost)];
+    str = [str stringByAppendingFormat:@"[%@ %@] %@ms ",self.className,self.methodName,@(self.timeCost)];
     // 子类信息
     if (self.subCosts.count) {
         str = [str stringByAppendingFormat:@"  %@ ",@(self.subCosts.count)];

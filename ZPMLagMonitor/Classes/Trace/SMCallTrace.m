@@ -122,10 +122,10 @@
         return arr;
     }
 
-    NSMutableArray *rootArray = [NSMutableArray new];
+    NSMutableArray *rootNodeArray = [NSMutableArray new];
+    // 转换数据模型
     smCallRecord *rd = &records[num-1];
     NSInteger rootDepth = rd->depth;
-
     for (int i = num-1; i >= 0 ; i--) {
         smCallRecord *rd = &records[i];
         SMCallTraceTimeCostModel *model = [SMCallTraceTimeCostModel new];
@@ -134,17 +134,16 @@
         model.isClassMethod = class_isMetaClass(rd->cls);
         model.timeCost = (double)rd->time / 1000000.0; // s
         model.callDepth = rd->depth;
-        model.index = i;
-        NSLog(@"%@-%@",model.methodName,@(model.callDepth));
+        model.index = num-i-1;
+        NSLog(@" %@   %@-%@",@(model.index),model.methodName,@(model.callDepth));
         [arr addObject:model];
         if (rootDepth == model.callDepth) {
-            [rootArray addObject:model];
+            [rootNodeArray addObject:model];
         }
     }
     // 计算各个栈的范围
-    NSInteger rootCount = rootArray.count;
+    NSInteger rootCount = rootNodeArray.count;
     NSMutableArray *rangeArray = [NSMutableArray new];
-
     if (rootCount <= 1 ) {
         NSRange range = NSMakeRange(0, arr.count);
         NSValue *value = [NSValue valueWithRange:range];
@@ -152,23 +151,23 @@
     }
     else{
         for (int i = 0; i < rootCount-1; i++) {
-            SMCallTraceTimeCostModel *model = rootArray[i];
-            SMCallTraceTimeCostModel *nextModel = rootArray[i+1];
+            SMCallTraceTimeCostModel *model = rootNodeArray[i];
+            SMCallTraceTimeCostModel *nextModel = rootNodeArray[i+1];
             NSInteger lengh = nextModel.index - model.index;
             NSRange range = NSMakeRange(model.index, lengh);
             NSValue *value = [NSValue valueWithRange:range];
             [rangeArray addObject:value];
             if (i == (rootCount-2)) {
-                NSInteger lengh = num - model.index;
-                NSRange range = NSMakeRange(model.index, lengh);
+                NSInteger lengh = num - nextModel.index;
+                NSRange range = NSMakeRange(nextModel.index, lengh);
                 NSValue *value = [NSValue valueWithRange:range];
                 [rangeArray addObject:value];
             }
         }
     }
 
-
-    [rootArray removeAllObjects];
+    // 构建树
+    NSMutableArray *rootArray = [[NSMutableArray alloc] init];
     for (NSValue *value in rangeArray) {
         NSRange range = [value rangeValue];
         SMCallTraceTimeCostModel *rootModel = [self createTreeWithCallArray:arr range:range];
@@ -185,13 +184,13 @@
         return nil;
     }
     SMCallTraceTimeCostModel *rootNode = callArray[range.location];
-    // 第一个树的
     for (NSInteger i = range.location; i < (range.location+range.length); i++) {
         SMCallTraceTimeCostModel *currentNode = callArray[i];
         if (currentNode.callDepth >= 0) {
             // 查找叶子节点
             for (NSUInteger j = i+1; j < (range.location+range.length); j++) {
                 SMCallTraceTimeCostModel *successorNode = callArray[j];
+                // 深度比 <= currentNode.callDepth 说明当前分支已查找完毕
                 if(currentNode.callDepth >= successorNode.callDepth){
                     //当前 currentNode 的叶子节点已经查找完毕，结束此次查找
                     break;
