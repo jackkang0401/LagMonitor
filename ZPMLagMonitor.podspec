@@ -24,7 +24,7 @@ TODO: Add long description of the pod here.
   s.homepage         = 'https://github.com/yongshuai.kang/ZPMLagMonitor'
   # s.screenshots     = 'www.example.com/screenshots_1', 'www.example.com/screenshots_2'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
-  s.author           = { 'yongshuai.kang' => 'yongshuai.kang@zhaopin.com.cn' }
+  s.author           = { 'yongshuai.kang' => 'kys0401@163.com' }
   s.source           = { :git => 'https://github.com/yongshuai.kang/ZPMLagMonitor.git', :tag => s.version.to_s }
   # s.social_media_url = 'https://twitter.com/<TWITTER_USERNAME>'
 
