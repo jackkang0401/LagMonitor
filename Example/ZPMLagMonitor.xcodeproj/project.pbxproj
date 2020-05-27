@@ -506,7 +506,7 @@
 				INFOPLIST_FILE = "ZPMLagMonitor/ZPMLagMonitor-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				MODULE_NAME = ExampleApp;
-				PRODUCT_BUNDLE_IDENTIFIER = "cn.com.zhaopin.ZPMLagMonitor-Example";
+				PRODUCT_BUNDLE_IDENTIFIER = "kys.ZPMLagMonitor-Example";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_VERSION = 4.0;
@@ -528,7 +528,7 @@
 				INFOPLIST_FILE = "ZPMLagMonitor/ZPMLagMonitor-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
 				MODULE_NAME = ExampleApp;
-				PRODUCT_BUNDLE_IDENTIFIER = "cn.com.zhaopin.ZPMLagMonitor-Example";
+				PRODUCT_BUNDLE_IDENTIFIER = "kys.ZPMLagMonitor-Example";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_VERSION = 4.0;
